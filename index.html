@@ -3,175 +3,267 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Night Shift: Doctor's Nightmare</title>
+    <title>The Night Shift: Interactive Version</title>
     <style>
         body {
-            margin: 0;
-            padding: 0;
-            background-color: #111;
-            color: white;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            overflow: hidden;
+            margin: 0; padding: 0;
+            background-color: #111; color: white;
+            font-family: 'Segoe UI', sans-serif;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            height: 100vh; overflow: hidden;
         }
-        #game-container {
-            position: relative;
-            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
-        }
+        #game-container { position: relative; }
         canvas {
-            border: 4px solid #333;
-            border-radius: 8px;
-            background-color: #fff;
+            border: 4px solid #333; border-radius: 8px;
+            background-color: #fff; cursor: pointer;
         }
         .ui-panel {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            background: rgba(0,0,0,0.7);
-            padding: 10px 20px;
-            border-radius: 5px;
-            pointer-events: none;
+            position: absolute; top: 10px; left: 10px;
+            background: rgba(0,0,0,0.85); padding: 12px 20px;
+            border-radius: 6px; pointer-events: none; min-width: 200px;
         }
-        .btn-action {
-            margin-top: 15px;
-            padding: 10px 20px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            border: none;
-            border-radius: 5px;
-            background-color: #28a745;
-            color: white;
+        .controls-hint {
+            margin-top: 10px; font-size: 14px; color: #aaa; text-align: center;
         }
-        .btn-action:hover { background-color: #218838; }
+        .btn-shift {
+            margin-top: 15px; padding: 12px 24px;
+            font-size: 16px; font-weight: bold; cursor: pointer;
+            border: none; border-radius: 5px;
+            background-color: #007bff; color: white;
+        }
+        .btn-shift:hover { background-color: #0056b3; }
     </style>
 </head>
 <body>
 
-    <h1 style="margin-bottom: 5px;">The Night Shift</h1>
-    <p style="margin-top: 0; color: #aaa;">शिफ्ट बदलें और गेम का मूड देखें!</p>
-
+    <h1 style="margin-bottom: 5px; font-size: 28px;">The Night Shift: Pro</h1>
+    
     <div id="game-container">
         <div class="ui-panel">
-            <div>शिफ्ट: <span id="shift-display" style="font-weight: bold; color: #ffc107;">दोपहर (कॉमेडी)</span></div>
-            <div>मरीज की स्थिति: <span id="status-display">मजेदार मूड में</span></div>
+            <div style="font-size: 18px; margin-bottom: 5px;">शिफ्ट: <span id="shift-name" style="color: #ffc107; font-weight:bold;">दोपहर (कॉमेडी)</span></div>
+            <div>स्कोर/हेल्थ: <span id="score-display" style="color: #22c55e; font-weight:bold;">0</span></div>
+            <div id="action-text" style="font-size: 13px; color: #ffeb3b; margin-top: 5px;"></div>
         </div>
         <canvas id="gameCanvas" width="800" height="450"></canvas>
     </div>
 
-    <button class="btn-action" onclick="nextShift()">अगली शिफ्ट में जाएं</button>
+    <div class="controls-hint" id="controls-text">माउस से फोन पर क्लिक करके उसे नीचे गिराएं!</div>
+    <button class="btn-shift" onclick="changeShift()">अगली शिफ्ट बदलें</button>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         
-        const shiftDisplay = document.getElementById('shift-display');
-        const statusDisplay = document.getElementById('status-display');
+        // UI Elements
+        const shiftNameTxt = document.getElementById('shift-name');
+        const scoreDisplay = document.getElementById('score-display');
+        const actionText = document.getElementById('action-text');
+        const controlsText = document.getElementById('controls-text');
 
-        // गेम स्टेट्स: 0 = कॉमेडी, 1 = सिम्युलेटर, 2 = हॉरर
-        let currentShift = 0; 
+        // Game States
+        let currentShift = 0; // 0: Comedy, 1: Simulator, 2: Horror
+        let score = 0;
+        let health = 100;
+        let gameOver = false;
 
-        // शिफ्ट की सेटिंग्स
-        const shiftSettings = [
-            { name: "दोपहर (कॉмеडी)", bg: "#eef7fa", text: "व्हाट्सएप यूनिवर्सिटी का मरीज: इसे फोन से दूर रखें!", color: "#000", status: "मरीज रील बना रहा है 📱" },
-            { name: "शाम (सीरियस सिम्युलेटर)", bg: "#d1d5db", text: "इमर्जन्सी सर्जरी: टांके लगाने के लिए क्लिक करें!", color: "#000", status: "हार्ट रेट: 72 BPM 💓" },
-            { name: "रात (सस्पेंस/हॉरर)", bg: "#0d0e12", text: "🚨 भागो! भूतिया मरीज जाग गया है!", color: "#ff3333", status: "खतरा! बत्तियां गुल हैं 🔦" }
-        ];
+        // Comedy Variables
+        let phoneY = 300;
+        let phoneSpeed = 1.5;
 
-        function drawGame() {
-            let setting = shiftSettings[currentShift];
-            
-            // 1. बैकग्राउंड साफ़ करें और रंग बदलें
-            ctx.fillStyle = setting.bg;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // Simulator Variables
+        let ecgY = 150;
+        let ecgDirection = 1;
+        let ecgTargetY = 150;
 
-            // 2. हर शिफ्ट के हिसाब से माहौल (Vibe) सेट करें
+        // Horror Variables
+        let playerX = 100;
+        let ghostX = 700;
+        let ghostY = 200;
+        let ghostSpeed = 3;
+        let keys = {};
+
+        // Key listeners for Horror Mode
+        window.addEventListener('keydown', (e) => keys[e.code] = true);
+        window.addEventListener('keyup', (e) => keys[e.code] = false);
+
+        // Mouse click listener for Comedy and Simulator
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
             if (currentShift === 0) {
-                // कॉमेडी मोड: कार्टूनिश कैरेक्टर (पीला स्माइली मरीज)
-                ctx.beginPath();
-                ctx.arc(400, 200, 60, 0, Math.PI * 2);
-                ctx.fillStyle = "#ffd43b";
-                ctx.fill();
-                ctx.stroke();
-                
-                // आँखें और फनी चश्मा
-                ctx.fillStyle = "#000";
-                ctx.fillRect(360, 180, 25, 15);
-                ctx.fillRect(415, 180, 25, 15);
-                ctx.strokeStyle = "#000";
-                ctx.lineWidth = 4;
-                ctx.beginPath(); ctx.moveTo(385, 187); ctx.lineTo(415, 187); ctx.stroke();
-                
-                // बड़ी मुस्कान
-                ctx.beginPath();
-                ctx.arc(400, 210, 25, 0, Math.PI);
-                ctx.stroke();
+                // फोन पर क्लिक चेक करें (फ़ोन 370xY साइज 60x90)
+                if (mouseX >= 370 && mouseX <= 430 && mouseY >= phoneY && mouseY <= phoneY + 90) {
+                    phoneY = 320; // फोन वापस नीचे
+                    score += 10;
+                    scoreDisplay.innerText = score;
+                }
+            } 
+            else if (currentShift === 1) {
+                // सिम्युलेटर में 'इंजेक्शन' बटन एरिया पर क्लिक
+                if (mouseX >= 320 && mouseX <= 480 && mouseY >= 350 && mouseY <= 400) {
+                    ecgTargetY = 150; // धड़कन सामान्य करें
+                    score += 15;
+                    scoreDisplay.innerText = score;
+                }
+            }
+        });
 
+        function changeShift() {
+            currentShift = (currentShift + 1) % 3;
+            gameOver = false;
+            
+            if (currentShift === 0) {
+                shiftNameTxt.innerText = "दोपहर (कॉमेडी)";
+                shiftNameTxt.style.color = "#ffc107";
+                score = 0;
+                scoreDisplay.innerText = score;
+                controlsText.innerText = "माउस से उड़ते फोन पर क्लिक करके उसे नीचे गिराएं!";
             } else if (currentShift === 1) {
-                // सीरियस सिम्युलेटर: ऑपरेशन टेबल और हार्ट मॉनिटर लाइन
-                ctx.strokeStyle = "#333";
-                ctx.lineWidth = 8;
-                ctx.strokeRect(200, 250, 400, 40); // बेड
+                shiftNameTxt.innerText = "शाम (सिम्युलेटर)";
+                shiftNameTxt.style.color = "#2196f3";
+                score = 0;
+                scoreDisplay.innerText = score;
+                controlsText.innerText = "जब धड़कन ऊपर-नीचे भागे, तो नीचे 'STABILIZE' बटन पर क्लिक करें!";
+            } else if (currentShift === 2) {
+                shiftNameTxt.innerText = "रात (सस्पेंस/हॉरर)";
+                shiftNameTxt.style.color = "#ff3333";
+                health = 100;
+                scoreDisplay.innerText = health + "%";
+                controlsText.innerText = "कीबोर्ड की Left / Right Arrow (या A/D) से भूत से दूर भागें!";
+            }
+        }
+
+        // मेन गेम लूप (Main Game Loop)
+        function updateAndDraw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // --- 1. कॉमेडी मोड ---
+            if (currentShift === 0) {
+                ctx.fillStyle = "#eef7fa";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                actionText.innerText = "मरीज को फोन से दूर रखें!";
+
+                // मरीज का चेहरा
+                ctx.beginPath(); ctx.arc(400, 200, 70, 0, Math.PI * 2);
+                ctx.fillStyle = "#ffd43b"; ctx.fill(); ctx.stroke();
+                ctx.fillStyle = "#000"; ctx.font = "20px Arial"; ctx.fillText("📱🤩", 375, 205);
+
+                // फोन ऊपर की तरफ भागेगा
+                phoneY -= phoneSpeed;
+                if(phoneY < 50) {
+                    phoneY = 320; // मिस होने पर वापस नीचे
+                }
+
+                // ड्रा फोन
+                ctx.fillStyle = "#333";
+                ctx.fillRect(370, phoneY, 60, 90);
+                ctx.fillStyle = "#4dabf7";
+                ctx.fillRect(375, phoneY + 5, 50, 65);
+                ctx.fillStyle = "#fff";
+                ctx.fillRect(395, phoneY + 75, 10, 10); // होम बटन
+            }
+
+            // --- 2. सिम्युलेटर मोड ---
+            else if (currentShift === 1) {
+                ctx.fillStyle = "#1e293b";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                actionText.innerText = "मरीज क्रिटिकल है!";
+
+                // धड़कन की लाइन को अनियंत्रित करना
+                ecgTargetY += ecgDirection * (Math.random() * 4);
+                if(ecgTargetY > 280 || ecgTargetY < 50) ecgDirection *= -1;
                 
-                // हार्ट रेट ग्राफ (ECG Line)
-                ctx.strokeStyle = "#22c55e";
-                ctx.lineWidth = 3;
+                ecgY += (ecgTargetY - ecgY) * 0.1; // स्मूथ ट्रांजिशन
+
+                // ECG मॉनिटर ग्रिड और लाइन
+                ctx.strokeStyle = "#0f172a"; ctx.lineWidth = 2;
+                for(let i=0; i<canvas.width; i+=40) {
+                    ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+                }
+
+                // हार्ट रेट लाइन ड्रा करें
+                ctx.strokeStyle = (Math.abs(150 - ecgY) > 50) ? "#ef4444" : "#22c55e";
+                ctx.lineWidth = 4;
                 ctx.beginPath();
-                ctx.moveTo(100, 100);
-                ctx.lineTo(200, 100); ctx.lineTo(220, 70); ctx.lineTo(240, 130); ctx.lineTo(260, 100);
-                ctx.lineTo(400, 100); ctx.lineTo(420, 70); ctx.lineTo(440, 130); ctx.lineTo(460, 100);
-                ctx.lineTo(700, 100);
+                ctx.moveTo(100, 150);
+                ctx.lineTo(300, 150); ctx.lineTo(350, ecgY); ctx.lineTo(400, 300 - ecgY); ctx.lineTo(450, 150);
+                ctx.lineTo(700, 150);
                 ctx.stroke();
 
-            } else if (currentShift === 2) {
-                // हॉरर मोड: अंधेरा और टॉर्च इफ़ेक्ट (Vignette)
-                // लाल चमकती आँखें
-                ctx.fillStyle = "#ff0000";
-                ctx.beginPath(); ctx.arc(350, 200, 8, 0, Math.PI*2); ctx.fill();
-                ctx.beginPath(); ctx.arc(450, 200, 8, 0, Math.PI*2); ctx.fill();
+                // स्टेबलाइज बटन (क्लिक करने के लिए)
+                ctx.fillStyle = "#e11d48";
+                ctx.fillRect(320, 350, 160, 50);
+                ctx.fillStyle = "#fff";
+                ctx.font = "bold 18px sans-serif";
+                ctx.fillText("STABILIZE", 355, 382);
+            }
 
-                // टॉर्च की रोशनी का भ्रम (सिंपल ओवरले)
-                let gradient = ctx.createRadialGradient(400, 225, 50, 400, 225, 300);
+            // --- 3. हॉरर मोड ---
+            else if (currentShift === 2) {
+                ctx.fillStyle = "#09090b";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                actionText.innerText = "🚨 भागो! वह आ रहा है!";
+
+                if (!gameOver) {
+                    // प्लेयर मूवमेंट (A/D या एरो कीज़)
+                    if (keys['KeyA'] || keys['ArrowLeft']) playerX -= 4;
+                    if (keys['KeyD'] || keys['ArrowRight']) playerX += 4;
+
+                    // बाउंड्री लॉक
+                    if (playerX < 20) playerX = 20;
+                    if (playerX > 760) playerX = 760;
+
+                    // भूत प्लेयर की तरफ बढ़ेगा
+                    if (ghostX < playerX) ghostX += ghostSpeed;
+                    else ghostX -= ghostSpeed;
+
+                    // भूत हवा में ऊपर नीचे होगा (सिर्फ डराने के लिए)
+                    ghostY = 200 + Math.sin(Date.now() / 200) * 30;
+
+                    // कोलिशन डिटेक्शन (टकराव)
+                    let dist = Math.abs(playerX - ghostX);
+                    if (dist < 40) {
+                        health -= 1;
+                        scoreDisplay.innerText = health + "%";
+                        if (health <= 0) gameOver = true;
+                    }
+                }
+
+                // टॉर्च इफ़ेक्ट (लाइट सर्कल)
+                ctx.save();
+                // डॉक्टर (खिलाड़ी)
+                ctx.fillStyle = "#fff";
+                ctx.beginPath(); ctx.arc(playerX, 300, 20, 0, Math.PI * 2); ctx.fill(); // सिर
+                ctx.fillRect(playerX - 10, 320, 20, 50); // बॉडी
+
+                // भूतिया मरीज
+                ctx.fillStyle = "rgba(239, 68, 68, 0.7)";
+                ctx.beginPath(); ctx.arc(ghostX, ghostY, 25, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = "#000"; ctx.fillText("👁 👁", ghostX - 18, ghostY + 5);
+
+                // टॉर्च मास्क (अंधेरा फैलाना सिर्फ डॉक्टर के आस-पास रोशनी छोड़कर)
+                let gradient = ctx.createRadialGradient(playerX, 320, 30, playerX, 320, 180);
                 gradient.addColorStop(0, 'transparent');
-                gradient.addColorStop(1, 'rgba(0, 0, 0, 0.95)');
+                gradient.addColorStop(1, 'rgba(0, 0, 0, 0.92)');
                 ctx.fillStyle = gradient;
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.restore();
+
+                if (gameOver) {
+                    ctx.fillStyle = "#ef4444";
+                    ctx.font = "bold 40px sans-serif";
+                    ctx.fillText("मरीज ने पकड़ लिया! GAME OVER", 140, 220);
+                }
             }
 
-            // 3. निर्देश टेक्स्ट लिखें
-            ctx.fillStyle = setting.color;
-            ctx.font = "bold 24px 'Segoe UI'";
-            ctx.textAlign = "center";
-            ctx.fillText(setting.text, canvas.width / 2, 380);
+            requestAnimationFrame(updateAndDraw);
         }
 
-        function nextShift() {
-            // अगली शिफ्ट पर जाएं (0 -> 1 -> 2 -> 0)
-            currentShift = (currentShift + 1) % 3;
-            
-            // UI अपडेट करें
-            let setting = shiftSettings[currentShift];
-            shiftDisplay.innerText = setting.name;
-            statusDisplay.innerText = setting.status;
-            
-            if(currentShift === 2) {
-                shiftDisplay.style.color = "#ff3333";
-            } else if(currentShift === 1) {
-                shiftDisplay.style.color = "#2196f3";
-            } else {
-                shiftDisplay.style.color = "#ffc107";
-            }
-
-            // स्क्रीन दोबारा ड्रा करें
-            drawGame();
-        }
-
-        // गेम की पहली ड्राइंग
-        drawGame();
+        // गेम शुरू करें
+        updateAndDraw();
     </script>
 </body>
 </html>
