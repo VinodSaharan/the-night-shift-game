@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Night Shift: Full Comedy Edition</title>
+    <title>The Night Shift: Funny Doctor</title>
     <style>
         body {
             margin: 0; padding: 0;
@@ -42,7 +42,7 @@
     <div id="game-container">
         <div class="ui-panel">
             <div style="font-size: 18px; margin-bottom: 5px;">शिफ्ट: <span id="shift-name" style="color: #ffc107; font-weight:bold;">दोपहर (कॉमेडी)</span></div>
-            <div>स्कोर / फनी पॉइंट्स: <span id="score-display" style="color: #22c55e; font-weight:bold;">0</span></div>
+            <div>स्कोर / लाइव्स: <span id="score-display" style="color: #22c55e; font-weight:bold;">0</span></div>
             <div id="action-text" style="font-size: 13px; color: #ffeb3b; margin-top: 5px;"></div>
         </div>
         <canvas id="gameCanvas" width="800" height="450"></canvas>
@@ -62,7 +62,7 @@
         const controlsText = document.getElementById('controls-text');
 
         // Game States
-        let currentShift = 0; // 0: Comedy, 1: Simulator, 2: Night Comedy
+        let currentShift = 0; 
         let score = 0;
         let lives = 3;
         let gameOver = false;
@@ -83,8 +83,23 @@
         let danceOffset = 0;
         let keys = {};
 
+        // Pillow Weapon Variables
+        let pillowX = -100; 
+        let pillowY = 350;
+        let isPillowActive = false;
+        let isPatientAsleep = false;
+        let sleepTimer = 0;
+
         // Key listeners
-        window.addEventListener('keydown', (e) => keys[e.code] = true);
+        window.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            
+            // अब Space की जगह 'W' या 'Up Arrow' दबाने पर तकिया फिंकेगा
+            if ((e.code === 'KeyW' || e.code === 'ArrowUp') && currentShift === 2 && !isPillowActive && !isPatientAsleep && !gameOver) {
+                pillowX = doctorX; 
+                isPillowActive = true;
+            }
+        });
         window.addEventListener('keyup', (e) => keys[e.code] = false);
 
         // Click handler
@@ -94,7 +109,6 @@
             const mouseY = e.clientY - rect.top;
 
             if (currentShift === 0) {
-                // फोन पर क्लिक
                 if (mouseX >= 370 && mouseX <= 430 && mouseY >= phoneY && mouseY <= phoneY + 90) {
                     phoneY = 320; 
                     score += 10;
@@ -102,7 +116,6 @@
                 }
             } 
             else if (currentShift === 1) {
-                // स्टेबलाइज बटन पर क्लिक
                 if (mouseX >= 320 && mouseX <= 480 && mouseY >= 350 && mouseY <= 400) {
                     ecgTargetY = 150; 
                     score += 15;
@@ -114,6 +127,9 @@
         function changeShift() {
             currentShift = (currentShift + 1) % 3;
             gameOver = false;
+            isPillowActive = false;
+            isPatientAsleep = false;
+            pillowX = -100;
             
             if (currentShift === 0) {
                 shiftNameTxt.innerText = "दोपहर (कॉमेडी)";
@@ -132,20 +148,18 @@
                 shiftNameTxt.style.color = "#e040fb";
                 lives = 3;
                 scoreDisplay.innerText = "लाइव्स: " + lives;
-                controlsText.innerText = "Left / Right Arrow (या A/D) से नींद में नाचते मरीज से बचकर भागें!";
+                controlsText.innerText = "A/D या Left/Right से भागें और 'W' या 'Up Arrow' दबाकर तकिया फेंकें!";
             }
         }
 
         function updateAndDraw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // --- 1. दोपहर की शिफ्ट (कॉमेडी) ---
             if (currentShift === 0) {
                 ctx.fillStyle = "#eef7fa";
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 actionText.innerText = "मरीज रील्स बनाने के लिए फोन मांग रहा है!";
 
-                // मरीज
                 ctx.beginPath(); ctx.arc(400, 200, 70, 0, Math.PI * 2);
                 ctx.fillStyle = "#ffd43b"; ctx.fill(); ctx.stroke();
                 ctx.fillStyle = "#000"; ctx.font = "20px Arial"; ctx.fillText("📱🤩", 375, 205);
@@ -153,13 +167,11 @@
                 phoneY -= phoneSpeed;
                 if(phoneY < 50) phoneY = 320;
 
-                // फोन ड्रा करें
                 ctx.fillStyle = "#333"; ctx.fillRect(370, phoneY, 60, 90);
                 ctx.fillStyle = "#4dabf7"; ctx.fillRect(375, phoneY + 5, 50, 65);
                 ctx.fillStyle = "#fff"; ctx.fillRect(395, phoneY + 75, 10, 10);
             }
 
-            // --- 2. शाम की शिफ्ट (सिम्युलेटर) ---
             else if (currentShift === 1) {
                 ctx.fillStyle = "#1e293b";
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -169,13 +181,11 @@
                 if(ecgTargetY > 280 || ecgTargetY < 50) ecgDirection *= -1;
                 ecgY += (ecgTargetY - ecgY) * 0.1;
 
-                // मॉनिटर ग्रिड
                 ctx.strokeStyle = "#0f172a"; ctx.lineWidth = 2;
                 for(let i=0; i<canvas.width; i+=40) {
                     ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
                 }
 
-                // फनी हार्ट रेट लाइन
                 ctx.strokeStyle = (Math.abs(150 - ecgY) > 50) ? "#ef4444" : "#22c55e";
                 ctx.lineWidth = 4;
                 ctx.beginPath();
@@ -184,18 +194,14 @@
                 ctx.lineTo(700, 150);
                 ctx.stroke();
 
-                // बटन
                 ctx.fillStyle = "#ff9800"; ctx.fillRect(320, 350, 160, 50);
                 ctx.fillStyle = "#fff"; ctx.font = "bold 16px sans-serif"; ctx.fillText("GIVE ANTACID", 342, 381);
             }
 
-            // --- 3. रात की शिफ्ट (नई फनी नाइट शिफ्ट) ---
             else if (currentShift === 2) {
-                ctx.fillStyle = "#311b92"; // मजेदार पर्पल नाइट बैकग्राउंड
+                ctx.fillStyle = "#311b92"; 
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-                actionText.innerText = "मरीज नींद में नागिन डांस कर रहा है! दूर रहो!";
 
-                // फनी डिस्को लाइट्स इफ़ेक्ट
                 danceOffset += 0.05;
                 ctx.fillStyle = `rgba(255, 255, 0, ${Math.sin(danceOffset) * 0.15 + 0.1})`;
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -208,32 +214,58 @@
                     if (doctorX < 20) doctorX = 20;
                     if (doctorX > 760) doctorX = 760;
 
-                    // मरीज एआई (AI) - डॉक्टर की तरफ मटकते हुए आएगा
-                    if (patientX < doctorX) patientX += patientSpeed;
-                    else patientX -= patientSpeed;
+                    let danceY = 280;
 
-                    // नागिन डांस वेव इफेक्ट (ऊपर-नीचे मटकना)
-                    let danceY = 280 + Math.sin(Date.now() / 150) * 40;
+                    if (isPatientAsleep) {
+                        actionText.innerText = "💤 मरीज सो रहा है! जल्दी से पास से निकल जाओ!";
+                        danceY = 320; 
+                        sleepTimer--;
+                        if (sleepTimer <= 0) {
+                            isPatientAsleep = false;
+                        }
+                    } else {
+                        actionText.innerText = "मरीज नींद में नागिन डांस कर रहा है! 'W' से तकिया फेंको!";
+                        if (patientX < doctorX) patientX += patientSpeed;
+                        else patientX -= patientSpeed;
 
-                    // डॉक्टर ड्रा करें (हरे रंग का एप्रन)
+                        danceY = 280 + Math.sin(Date.now() / 150) * 40; 
+
+                        // चेक करें क्या मरीज तकिये के ऊपर आया
+                        if (isPillowActive && Math.abs(patientX - pillowX) < 30) {
+                            isPillowActive = false;
+                            isPatientAsleep = true;
+                            sleepTimer = 180; // 3 सेकंड के लिए सोएगा
+                            pillowX = -100;
+                        }
+
+                        // डॉक्टर से टकराव
+                        if (Math.abs(doctorX - patientX) < 35 && Math.abs(320 - danceY) < 50) {
+                            lives -= 1;
+                            patientX = (doctorX < 400) ? 700 : 100; 
+                            scoreDisplay.innerText = "लाइव्स: " + lives;
+                            if (lives <= 0) gameOver = true;
+                        }
+                    }
+
+                    // तकिया ड्रा करें
+                    if (isPillowActive) {
+                        ctx.fillStyle = "#e0e0e0";
+                        ctx.fillRect(pillowX - 15, pillowY, 30, 20); 
+                        ctx.strokeStyle = "#9e9e9e"; ctx.strokeRect(pillowX - 15, pillowY, 30, 20);
+                    }
+
+                    // डॉक्टर ड्रा करें
                     ctx.fillStyle = "#22c55e";
-                    ctx.beginPath(); ctx.arc(doctorX, 300, 20, 0, Math.PI * 2); ctx.fill(); // सिर
-                    ctx.fillRect(doctorX - 12, 320, 24, 50); // बॉडी
+                    ctx.beginPath(); ctx.arc(doctorX, 300, 20, 0, Math.PI * 2); ctx.fill(); 
+                    ctx.fillRect(doctorX - 12, 320, 24, 50); 
                     ctx.fillStyle = "#fff"; ctx.font = "14px Arial"; ctx.fillText("👨‍⚕️", doctorX - 10, 315);
 
-                    // नाचता हुआ मरीज ड्रा करें (अजीब तकिया हाथ में लिए)
+                    // मरीज ड्रा करें
                     ctx.fillStyle = "#ff4081";
                     ctx.beginPath(); ctx.arc(patientX, danceY, 22, 0, Math.PI * 2); ctx.fill();
                     ctx.fillRect(patientX - 12, danceY + 22, 24, 45);
-                    ctx.fillStyle = "#fff"; ctx.font = "16px Arial"; ctx.fillText("😴🕺", patientX - 15, danceY + 10);
-
-                    // टकराव चेक करें (Collision)
-                    if (Math.abs(doctorX - patientX) < 35 && Math.abs(320 - danceY) < 50) {
-                        lives -= 1;
-                        patientX = (doctorX < 400) ? 700 : 100; // टकराने पर मरीज दूर चला जाएगा
-                        scoreDisplay.innerText = "लाइव्स: " + lives;
-                        if (lives <= 0) gameOver = true;
-                    }
+                    ctx.fillStyle = "#fff"; ctx.font = "16px Arial"; 
+                    ctx.fillText(isPatientAsleep ? "😴💤" : "😴🕺", patientX - 15, danceY + 10);
                 }
 
                 if (gameOver) {
@@ -246,7 +278,6 @@
             requestAnimationFrame(updateAndDraw);
         }
 
-        // गेम शुरू करें
         updateAndDraw();
     </script>
 </body>
